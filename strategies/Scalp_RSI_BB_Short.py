@@ -23,41 +23,39 @@ from technical import qtpylib
 
 class Scalp_RSI_BB_Short(IStrategy):
     """
-    AI Crypto Scalping Agent
-    Short-enabled Scalping Strategy using RSI + Bollinger Bands (Mean Reversion)
-    Supports both Long and Short positions.
-    Best used on 5m or 1m timeframe.
+    AI Crypto Scalping Agent - Improved Version
+    Short-enabled Scalping Strategy (RSI + Bollinger Bands + Filters)
+    
+    Improvements:
+    - Volume filter
+    - Mild trend filter (EMA)
+    - Better hyperopt parameters
+    - Cleaner risk settings for scalping
     """
 
     INTERFACE_VERSION = 3
 
-    # Timeframe
-    timeframe = "5m"                # Change to "1m" for more aggressive scalping
-
-    # Enable shorting
+    timeframe = "5m"
     can_short = True
 
-    # Fast ROI for scalping
+    # Scalping ROI
     minimal_roi = {
-        "0": 0.012,     # 1.2%
-        "8": 0.008,     # 0.8%
-        "16": 0.004,    # 0.4%
-        "30": 0         # Force exit
+        "0": 0.012,
+        "8": 0.008,
+        "16": 0.004,
+        "30": 0
     }
 
-    # Tight stoploss
-    stoploss = -0.012               # 1.2%
+    stoploss = -0.012
 
-    # Trailing stop
     trailing_stop = True
     trailing_stop_positive = 0.004
     trailing_stop_positive_offset = 0.008
     trailing_only_offset_is_reached = True
 
     process_only_new_candles = True
-    startup_candle_count = 30
+    startup_candle_count = 40
 
-    # Order types
     order_types = {
         "entry": "limit",
         "exit": "limit",
@@ -79,6 +77,9 @@ class Scalp_RSI_BB_Short(IStrategy):
     bb_period = IntParameter(16, 24, default=20, space="buy")
     bb_std = DecimalParameter(1.8, 2.4, default=2.0, decimals=1, space="buy")
 
+    # Volume multiplier
+    volume_factor = DecimalParameter(0.6, 1.2, default=0.75, decimals=2, space="buy")
+
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # RSI
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)
@@ -93,6 +94,10 @@ class Scalp_RSI_BB_Short(IStrategy):
         dataframe["bb_middle"] = bollinger["mid"]
         dataframe["bb_upper"] = bollinger["upper"]
 
+        # Trend filter (EMA)
+        dataframe["ema_50"] = ta.EMA(dataframe, timeperiod=50)
+        dataframe["ema_20"] = ta.EMA(dataframe, timeperiod=20)
+
         # Volume
         dataframe["volume_mean"] = dataframe["volume"].rolling(window=20).mean()
 
@@ -100,22 +105,26 @@ class Scalp_RSI_BB_Short(IStrategy):
 
     def populate_entry_trend(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         # === LONG Entry ===
+        # Oversold + lower band + volume + mild bullish bias
         dataframe.loc[
             (
                 (dataframe["rsi"] < self.buy_rsi.value) &
                 (dataframe["close"] <= dataframe["bb_lower"]) &
-                (dataframe["volume"] > dataframe["volume_mean"] * 0.7) &
+                (dataframe["volume"] > dataframe["volume_mean"] * self.volume_factor.value) &
+                (dataframe["ema_20"] > dataframe["ema_50"]) &          # mild uptrend filter
                 (dataframe["volume"] > 0)
             ),
             "enter_long"
         ] = 1
 
         # === SHORT Entry ===
+        # Overbought + upper band + volume + mild bearish bias
         dataframe.loc[
             (
                 (dataframe["rsi"] > self.short_rsi.value) &
                 (dataframe["close"] >= dataframe["bb_upper"]) &
-                (dataframe["volume"] > dataframe["volume_mean"] * 0.7) &
+                (dataframe["volume"] > dataframe["volume_mean"] * self.volume_factor.value) &
+                (dataframe["ema_20"] < dataframe["ema_50"]) &          # mild downtrend filter
                 (dataframe["volume"] > 0)
             ),
             "enter_short"
@@ -133,7 +142,7 @@ class Scalp_RSI_BB_Short(IStrategy):
             "exit_long"
         ] = 1
 
-        # === SHORT Exit (cover) ===
+        # === SHORT Exit ===
         dataframe.loc[
             (
                 (dataframe["rsi"] < self.cover_rsi.value) |

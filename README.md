@@ -1,35 +1,60 @@
 # Ai Crypto Scalping Agent
 
-**Short-enabled Freqtrade scalping strategy** powered by RSI + Bollinger Bands.
+**Short-enabled AI Crypto Scalping Agent** built on Freqtrade.
 
-This project contains a ready-to-use Freqtrade strategy that can trade both **Long** and **Short** positions on crypto futures markets.
+A modular scalping system designed for crypto futures that supports both Long and Short positions.
 
-## Strategy Overview
+---
 
-**Name:** `Scalp_RSI_BB_Short`
+## Current Features
+
+- Short-enabled RSI + Bollinger Bands scalping strategy
+- Volume + trend filters for higher quality entries
+- Tight risk management (stoploss + trailing stop)
+- Hyperopt-ready parameters
+- Clean project structure
+
+---
+
+## Project Structure
+
+```
+Ai-Crypto-Scalping-Agent/
+├── README.md
+├── config/
+│   └── config_futures_example.json
+└── strategies/
+    └── Scalp_RSI_BB_Short.py
+```
+
+---
+
+## Strategy: Scalp_RSI_BB_Short
 
 ### Logic
-- **Long Entry**: RSI oversold + price at/near lower Bollinger Band + volume confirmation
-- **Short Entry**: RSI overbought + price at/near upper Bollinger Band + volume confirmation
-- **Exits**: Mean reversion back to middle band or RSI extremes
-- Tight stoploss + trailing stop designed for scalping
+- **Long**: RSI oversold + price near lower Bollinger Band + volume confirmation + mild uptrend filter
+- **Short**: RSI overbought + price near upper Bollinger Band + volume confirmation + mild downtrend filter
+- **Exits**: Mean reversion to middle band or RSI extremes
+- Trailing stop + tight hard stoploss
 
-### Best used on
-- Timeframe: `5m` (or `1m` for more aggressive scalping)
-- Markets: Crypto Futures (Binance Futures, Bybit, etc.)
+### Recommended Settings
+- Timeframe: `5m` (or `1m` for aggressive mode)
+- Trading mode: Futures
+- Margin mode: Isolated
+- Leverage: Start with 2x–3x
 
-## Quick Start with Freqtrade
+---
 
-1. Copy the strategy file into your Freqtrade `user_data/strategies/` folder:
+## Quick Start
+
+1. Copy the strategy:
    ```bash
    cp strategies/Scalp_RSI_BB_Short.py /path/to/freqtrade/user_data/strategies/
    ```
 
-2. Make sure your `config.json` has shorting enabled:
-   ```json
-   "trading_mode": "futures",
-   "margin_mode": "isolated",
-   "can_short": true
+2. Use the example config (or merge the important settings into your own):
+   ```bash
+   cp config/config_futures_example.json /path/to/freqtrade/user_data/config.json
    ```
 
 3. Backtest:
@@ -37,24 +62,30 @@ This project contains a ready-to-use Freqtrade strategy that can trade both **Lo
    freqtrade backtesting --strategy Scalp_RSI_BB_Short -i 5m
    ```
 
-4. Dry-run / Live:
+4. Dry-run:
    ```bash
    freqtrade trade --strategy Scalp_RSI_BB_Short
    ```
 
-## Project Structure
+---
 
-```
-Ai-Crypto-Scalping-Agent/
-├── README.md
-└── strategies/
-    └── Scalp_RSI_BB_Short.py
-```
+## Roadmap (Building Together)
 
-## Disclaimer
-
-This is an experimental strategy for educational purposes. Cryptocurrency trading involves significant risk of loss. Always start with dry-run / paper trading. Past performance is not indicative of future results.
+- [x] Base short-enabled scalping strategy
+- [x] Volume + trend filters
+- [x] Basic risk management
+- [x] Project structure + example config
+- [ ] Aggressive 1-minute version
+- [ ] Advanced risk management (daily loss limit, position sizing)
+- [ ] FreqAI / Machine Learning integration
+- [ ] Better documentation & hyperopt configs
 
 ---
 
-Created as part of the **Ai Crypto Scalping Agent** project.
+## Disclaimer
+
+This project is for educational and research purposes only. Cryptocurrency trading involves substantial risk of loss. Always start with dry-run / paper trading. Never risk money you cannot afford to lose.
+
+---
+
+**Ai Crypto Scalping Agent** – Built step by step.
