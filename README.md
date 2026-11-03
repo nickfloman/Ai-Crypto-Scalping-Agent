@@ -6,13 +6,12 @@ A modular scalping system designed for crypto futures that supports both Long an
 
 ---
 
-## Current Features
+## Strategies Included
 
-- Short-enabled RSI + Bollinger Bands scalping strategy
-- Volume + trend filters for higher quality entries
-- Tight risk management (stoploss + trailing stop)
-- Hyperopt-ready parameters
-- Clean project structure
+| Strategy                      | Timeframe | Style              | Description                                      |
+|-------------------------------|-----------|--------------------|--------------------------------------------------|
+| `Scalp_RSI_BB_Short`          | 5m        | Balanced           | Main strategy with volume + trend filters        |
+| `Scalp_RSI_BB_Short_1m`       | 1m        | Aggressive         | Faster version optimized for 1-minute scalping   |
 
 ---
 
@@ -24,58 +23,60 @@ Ai-Crypto-Scalping-Agent/
 ├── config/
 │   └── config_futures_example.json
 └── strategies/
-    └── Scalp_RSI_BB_Short.py
+    ├── Scalp_RSI_BB_Short.py
+    └── Scalp_RSI_BB_Short_1m.py
 ```
 
 ---
 
-## Strategy: Scalp_RSI_BB_Short
+## Strategy Details
 
-### Logic
-- **Long**: RSI oversold + price near lower Bollinger Band + volume confirmation + mild uptrend filter
-- **Short**: RSI overbought + price near upper Bollinger Band + volume confirmation + mild downtrend filter
-- **Exits**: Mean reversion to middle band or RSI extremes
-- Trailing stop + tight hard stoploss
+### 1. Scalp_RSI_BB_Short (5m - Recommended starting point)
+- RSI + Bollinger Bands
+- Volume filter + EMA trend filter
+- Stoploss: 1.2% | Trailing stop enabled
 
-### Recommended Settings
-- Timeframe: `5m` (or `1m` for aggressive mode)
-- Trading mode: Futures
-- Margin mode: Isolated
-- Leverage: Start with 2x–3x
+### 2. Scalp_RSI_BB_Short_1m (Aggressive)
+- Faster RSI (period 10) and Bollinger Bands
+- Tighter stoploss (0.8%) and faster ROI
+- Designed for higher trade frequency on 1m candles
+- More sensitive entries
 
 ---
 
 ## Quick Start
 
-1. Copy the strategy:
+1. Copy the strategy you want:
    ```bash
    cp strategies/Scalp_RSI_BB_Short.py /path/to/freqtrade/user_data/strategies/
+   # or
+   cp strategies/Scalp_RSI_BB_Short_1m.py /path/to/freqtrade/user_data/strategies/
    ```
 
-2. Use the example config (or merge the important settings into your own):
+2. Use the example futures config:
    ```bash
    cp config/config_futures_example.json /path/to/freqtrade/user_data/config.json
    ```
 
-3. Backtest:
+3. Backtest example (5m):
    ```bash
    freqtrade backtesting --strategy Scalp_RSI_BB_Short -i 5m
    ```
 
-4. Dry-run:
+4. Backtest example (1m):
    ```bash
-   freqtrade trade --strategy Scalp_RSI_BB_Short
+   freqtrade backtesting --strategy Scalp_RSI_BB_Short_1m -i 1m
    ```
 
 ---
 
-## Roadmap (Building Together)
+## Roadmap
 
-- [x] Base short-enabled scalping strategy
-- [x] Volume + trend filters
+- [x] Base short-enabled scalping strategy (5m)
+- [x] Volume + Trend filters
 - [x] Basic risk management
 - [x] Project structure + example config
-- [ ] Aggressive 1-minute version
+- [x] Aggressive 1-minute version
 - [ ] Advanced risk management (daily loss limit, position sizing)
 - [ ] FreqAI / Machine Learning integration
 - [ ] Better documentation & hyperopt configs
