@@ -2,16 +2,33 @@
 
 **Short-enabled AI Crypto Scalping Agent** built on Freqtrade.
 
-A modular scalping system designed for crypto futures that supports both Long and Short positions.
+A modular scalping system for crypto futures with Long + Short support and advanced risk management.
 
 ---
 
-## Strategies Included
+## Strategies
 
-| Strategy                      | Timeframe | Style              | Description                                      |
-|-------------------------------|-----------|--------------------|--------------------------------------------------|
-| `Scalp_RSI_BB_Short`          | 5m        | Balanced           | Main strategy with volume + trend filters        |
-| `Scalp_RSI_BB_Short_1m`       | 1m        | Aggressive         | Faster version optimized for 1-minute scalping   |
+| Strategy                      | Timeframe | Style          | Risk Management      |
+|-------------------------------|-----------|----------------|----------------------|
+| `Scalp_RSI_BB_Short`          | 5m        | Balanced       | Full protections     |
+| `Scalp_RSI_BB_Short_1m`       | 1m        | Aggressive     | Full protections     |
+
+---
+
+## Advanced Risk Management Features
+
+Both strategies now include:
+
+### 1. Dynamic Position Sizing
+- Risks a fixed % of your account per trade (default 1% on 5m, 0.8% on 1m)
+- Automatically calculates stake size based on stoploss distance
+- Optional hard cap on stake amount
+
+### 2. Protections (built-in)
+- **CooldownRate** → Prevents overtrading
+- **StoplossGuard** → Pauses after consecutive losses
+- **MaxDrawdown** → Stops trading if drawdown exceeds limit (8% on 5m / 6% on 1m)
+- **LowProfitPairs** → Avoids repeatedly trading losing pairs (5m version)
 
 ---
 
@@ -29,44 +46,18 @@ Ai-Crypto-Scalping-Agent/
 
 ---
 
-## Strategy Details
-
-### 1. Scalp_RSI_BB_Short (5m - Recommended starting point)
-- RSI + Bollinger Bands
-- Volume filter + EMA trend filter
-- Stoploss: 1.2% | Trailing stop enabled
-
-### 2. Scalp_RSI_BB_Short_1m (Aggressive)
-- Faster RSI (period 10) and Bollinger Bands
-- Tighter stoploss (0.8%) and faster ROI
-- Designed for higher trade frequency on 1m candles
-- More sensitive entries
-
----
-
 ## Quick Start
 
-1. Copy the strategy you want:
-   ```bash
-   cp strategies/Scalp_RSI_BB_Short.py /path/to/freqtrade/user_data/strategies/
-   # or
-   cp strategies/Scalp_RSI_BB_Short_1m.py /path/to/freqtrade/user_data/strategies/
-   ```
+```bash
+# Copy strategy
+cp strategies/Scalp_RSI_BB_Short.py user_data/strategies/
 
-2. Use the example futures config:
-   ```bash
-   cp config/config_futures_example.json /path/to/freqtrade/user_data/config.json
-   ```
+# Backtest
+freqtrade backtesting --strategy Scalp_RSI_BB_Short -i 5m
 
-3. Backtest example (5m):
-   ```bash
-   freqtrade backtesting --strategy Scalp_RSI_BB_Short -i 5m
-   ```
-
-4. Backtest example (1m):
-   ```bash
-   freqtrade backtesting --strategy Scalp_RSI_BB_Short_1m -i 1m
-   ```
+# Dry-run
+freqtrade trade --strategy Scalp_RSI_BB_Short
+```
 
 ---
 
@@ -77,7 +68,7 @@ Ai-Crypto-Scalping-Agent/
 - [x] Basic risk management
 - [x] Project structure + example config
 - [x] Aggressive 1-minute version
-- [ ] Advanced risk management (daily loss limit, position sizing)
+- [x] Advanced risk management (position sizing + protections)
 - [ ] FreqAI / Machine Learning integration
 - [ ] Better documentation & hyperopt configs
 
