@@ -21,6 +21,10 @@ from freqtrade.persistence import Trade as TradeModel
 import talib.abstract as ta
 from technical import qtpylib
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Scalp_RSI_BB_Short(IStrategy):
     """
@@ -30,7 +34,7 @@ class Scalp_RSI_BB_Short(IStrategy):
     - Short-enabled RSI + Bollinger Bands
     - Volume + Trend filters
     - Dynamic position sizing
-    - Protections (cooldown, max drawdown, stoploos guard)
+    - Protections (cooldown, max drawdown, stoploss guard)
     """
 
     INTERFACE_VERSION = 3
@@ -53,12 +57,20 @@ class Scalp_RSI_BB_Short(IStrategy):
     trailing_only_offset_is_reached = True
 
     process_only_new_candles = True
-    startup_candle_count = 40
+    # EMA50 (and the BB window, up to 24) need enough history to converge;
+    # 40 candles left the first ~10 candles of every run with bad signals.
+    startup_candle_count = 100
 
     # === ADVANCED RISK MANAGEMENT ===
     # Position sizing: risk a fixed % of account per trade
     risk_per_trade = 0.01          # Risk 1% of account per trade
-    max_stake_amount = 100         # Optional hard cap in USDT (set None to disable)
+    # Hard cap in USDT (set None to disable). NOTE: the stake is the LESSER of
+    # the risk-based size and this cap. With stoploss -1.2% the risk-based size
+    # is ~83% of the balance, so on small accounts the cap is what binds and
+    # the real risk per trade is cap * stoploss / balance (e.g. $100 * 1.2% /
+    # $1000 = 0.12%), not risk_per_trade.
+    max_stake_amount = 100
+    fixed_leverage = 1.0           # Explicit; the sizing math below uses it
 
     order_types = {
         "entry": "limit",
@@ -87,10 +99,9 @@ class Scalp_RSI_BB_Short(IStrategy):
     def protections(self):
         return [
             {
-                # Cooldown after any trade closes (prevents overtrading)
-                "method": "CooldownRate",
-                "lookback_period_candles": 3,
-                "trade_limit": 2,
+                # Per-pair cooldown after a trade closes (prevents overtrading).
+                # CooldownPeriod only takes a duration; there is no "CooldownRate".
+                "method": "CooldownPeriod",
                 "stop_duration_candles": 6
             },
             {
@@ -122,24 +133,30 @@ class Scalp_RSI_BB_Short(IStrategy):
             }
         ]
 
+    def leverage(self, pair: str, current_time: datetime, current_rate: float,
+                 proposed_leverage: float, max_leverage: float, entry_tag: Optional[str],
+                 side: str, **kwargs) -> float:
+        """Fixed leverage so position sizing below is exact (futures only)."""
+        return min(self.fixed_leverage, max_leverage)
+
     def custom_stake_amount(self, pair: str, current_time: datetime, current_rate: float,
                             proposed_stake: float, min_stake: Optional[float], max_stake: float,
                             leverage: float, entry_tag: Optional[str], side: str,
                             **kwargs) -> float:
         """
         Dynamic position sizing based on risk percentage.
-        Risks a fixed % of the account balance per trade.
+        Risks a fixed % of the TOTAL account balance per trade (so sizing does
+        not shrink just because other trades are open).
+
+        The stake is margin, and the loss at the stoploss is
+        stake * leverage * |stoploss|, so
+        stake = risk_amount / (|stoploss| * leverage).
         """
         try:
-            # Get current free balance in stake currency
-            free_balance = self.wallets.get_free(self.config["stake_currency"])
+            balance = self.wallets.get_total(self.config["stake_currency"])
+            risk_amount = balance * self.risk_per_trade
 
-            # Calculate stake based on risk
-            # For futures with leverage, risk is applied on margin
-            risk_amount = free_balance * self.risk_per_trade
-
-            # Convert risk amount into stake size considering stoploss distance
-            stop_distance = abs(self.stoploss)
+            stop_distance = abs(self.stoploss) * max(leverage, 1.0)
             if stop_distance > 0:
                 stake = risk_amount / stop_distance
             else:
@@ -156,8 +173,13 @@ class Scalp_RSI_BB_Short(IStrategy):
             return stake
 
         except Exception:
-            # Fallback to proposed stake if anything fails
-            return proposed_stake
+            # Never fall back to an uncapped stake: with stake_amount
+            # "unlimited" the proposed stake can be a large share of the wallet.
+            logger.exception("custom_stake_amount failed for %s; using capped fallback", pair)
+            fallback = proposed_stake
+            if self.max_stake_amount is not None:
+                fallback = min(fallback, self.max_stake_amount)
+            return fallback
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=14)

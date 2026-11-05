@@ -20,6 +20,10 @@ from freqtrade.strategy import (
 import talib.abstract as ta
 from technical import qtpylib
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 class Scalp_RSI_BB_Short_1m(IStrategy):
     """
@@ -50,7 +54,12 @@ class Scalp_RSI_BB_Short_1m(IStrategy):
 
     # === ADVANCED RISK MANAGEMENT ===
     risk_per_trade = 0.008         # Slightly lower risk on 1m (0.8%)
+    # Hard cap in USDT. The stake is the LESSER of the risk-based size and this
+    # cap. With stoploss -0.8% the risk-based size equals the whole balance, so
+    # the cap is what binds above ~$64 and the real risk per trade is
+    # cap * stoploss / balance (e.g. $80 * 0.8% / $1000 = 0.064%).
     max_stake_amount = 80
+    fixed_leverage = 1.0           # Explicit; the sizing math below uses it
 
     order_types = {
         "entry": "limit",
@@ -77,9 +86,9 @@ class Scalp_RSI_BB_Short_1m(IStrategy):
     def protections(self):
         return [
             {
-                "method": "CooldownRate",
-                "lookback_period_candles": 5,
-                "trade_limit": 3,
+                # Per-pair cooldown after a trade closes. CooldownPeriod only
+                # takes a duration; there is no "CooldownRate".
+                "method": "CooldownPeriod",
                 "stop_duration_candles": 10
             },
             {
@@ -100,14 +109,25 @@ class Scalp_RSI_BB_Short_1m(IStrategy):
             }
         ]
 
+    def leverage(self, pair: str, current_time: datetime, current_rate: float,
+                 proposed_leverage: float, max_leverage: float, entry_tag: Optional[str],
+                 side: str, **kwargs) -> float:
+        """Fixed leverage so position sizing below is exact (futures only)."""
+        return min(self.fixed_leverage, max_leverage)
+
     def custom_stake_amount(self, pair: str, current_time: datetime, current_rate: float,
                             proposed_stake: float, min_stake: Optional[float], max_stake: float,
                             leverage: float, entry_tag: Optional[str], side: str,
                             **kwargs) -> float:
+        """
+        Risk a fixed % of the TOTAL balance per trade. The stake is margin and
+        the loss at the stoploss is stake * leverage * |stoploss|, so
+        stake = risk_amount / (|stoploss| * leverage).
+        """
         try:
-            free_balance = self.wallets.get_free(self.config["stake_currency"])
-            risk_amount = free_balance * self.risk_per_trade
-            stop_distance = abs(self.stoploss)
+            balance = self.wallets.get_total(self.config["stake_currency"])
+            risk_amount = balance * self.risk_per_trade
+            stop_distance = abs(self.stoploss) * max(leverage, 1.0)
 
             if stop_distance > 0:
                 stake = risk_amount / stop_distance
@@ -121,7 +141,12 @@ class Scalp_RSI_BB_Short_1m(IStrategy):
             stake = min(stake, max_stake)
             return stake
         except Exception:
-            return proposed_stake
+            # Never fall back to an uncapped stake (stake_amount is "unlimited").
+            logger.exception("custom_stake_amount failed for %s; using capped fallback", pair)
+            fallback = proposed_stake
+            if self.max_stake_amount is not None:
+                fallback = min(fallback, self.max_stake_amount)
+            return fallback
 
     def populate_indicators(self, dataframe: DataFrame, metadata: dict) -> DataFrame:
         dataframe["rsi"] = ta.RSI(dataframe, timeperiod=10)
