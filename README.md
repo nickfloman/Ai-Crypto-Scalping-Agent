@@ -20,12 +20,12 @@ A modular scalping system for crypto futures with Long + Short support and advan
 Both strategies now include:
 
 ### 1. Dynamic Position Sizing
-- Risks a fixed % of your account per trade (default 1% on 5m, 0.8% on 1m)
+- Sizes each trade so a stoploss hit loses a fixed % of your total balance (default 1% on 5m, 0.8% on 1m), at the strategy's fixed leverage (default 1x)
 - Automatically calculates stake size based on stoploss distance
-- Optional hard cap on stake amount
+- Hard cap on stake amount (default $100 on 5m, $80 on 1m). The stake is the **lesser** of the risk-based size and the cap, so on small accounts the cap binds: with a $1,000 balance the real risk per trade is about 0.12% (5m) and 0.064% (1m). Raise or remove `max_stake_amount` if you want the full risk percentage.
 
 ### 2. Protections (built-in)
-- **CooldownRate** → Prevents overtrading
+- **CooldownPeriod** → Per-pair pause after a trade closes (prevents overtrading)
 - **StoplossGuard** → Pauses after consecutive losses
 - **MaxDrawdown** → Stops trading if drawdown exceeds limit (8% on 5m / 6% on 1m)
 - **LowProfitPairs** → Avoids repeatedly trading losing pairs (5m version)
