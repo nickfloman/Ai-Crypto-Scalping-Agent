@@ -39,7 +39,8 @@ Ai-Crypto-Scalping-Agent/
 ├── README.md
 ├── LICENSE
 ├── config/
-│   ├── config_futures_example.json   # Ready-to-use futures config
+│   ├── config_futures_example.json   # 5m futures config (dry-run / live pair selection)
+│   ├── config_futures_1m_example.json # 1m futures config (static pairs, backtest-ready)
 │   └── hyperopt_ranges.md            # Recommended hyperopt settings
 └── strategies/
     ├── Scalp_RSI_BB_Short.py
@@ -69,6 +70,23 @@ freqtrade trade --strategy Scalp_RSI_BB_Short
 
 ### Pair Selection
 The example config uses **VolumePairList** (top 20 by quote volume) + AgeFilter + PriceFilter + SpreadFilter instead of a static list. This is better for scalping.
+
+> **Backtesting and hyperopt:** Freqtrade refuses to backtest or hyperopt with `VolumePairList`, `AgeFilter` or `SpreadFilter` (`Pairlist Handlers ... do not support backtesting`; checked against Freqtrade 2026.10). `--pairs` does not get around it. To backtest or hyperopt, use a config whose pairlist is `StaticPairList`, such as `config/config_futures_1m_example.json` below.
+
+### 1m strategy
+
+`config/config_futures_1m_example.json` is the matching config for `Scalp_RSI_BB_Short_1m`. A config's `timeframe` overrides the strategy's, so running the 1m strategy with the 5m config silently trades 5m candles.
+
+```bash
+cp strategies/Scalp_RSI_BB_Short_1m.py user_data/strategies/
+cp config/config_futures_1m_example.json user_data/config_1m.json
+
+freqtrade download-data --exchange binance --trading-mode futures --timeframes 1m --days 30 -c user_data/config_1m.json
+freqtrade backtesting -c user_data/config_1m.json --strategy Scalp_RSI_BB_Short_1m --timerange 20251001-
+freqtrade trade -c user_data/config_1m.json --strategy Scalp_RSI_BB_Short_1m   # dry-run
+```
+
+How it differs from the 5m config: `timeframe` 1m, the 1m strategy, `bot_name` `AiCryptoScalpingAgent1m`, a **2-minute** unfilled-order timeout (10 minutes is ten 1m candles), and a static list of five liquid majors so it can be backtested. 1m scalping needs tight spreads and deep books, which these pairs have. It stays `dry_run: true` with empty API keys.
 
 ---
 
